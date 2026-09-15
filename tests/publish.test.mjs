@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 
 const html = await fs.readFile(new URL("../index.html", import.meta.url), "utf8");
+const embeddedRecords = JSON.parse(html.match(/const DATA=(.*);\r?\nconst PAGE_SIZE/s)[1]);
 
 test("published dashboard is complete and self-contained", () => {
   assert.match(html, /<!doctype html>/i);
@@ -23,6 +24,31 @@ test("published dashboard is complete and self-contained", () => {
 test("published dashboard contains all 450 ASIN records", () => {
   assert.equal((html.match(/"asin":/g) ?? []).length, 450);
   assert.match(html, /数据更新：2026-09-15/);
+});
+
+test("published dashboard exposes the no-action status across data and UI", () => {
+  const statusCounts = embeddedRecords.reduce((counts, row) => {
+    counts[row.status] = (counts[row.status] ?? 0) + 1;
+    return counts;
+  }, {});
+
+  assert.deepEqual(statusCounts, {
+    成功: 384,
+    失败: 25,
+    待处理: 32,
+    无需处理: 9,
+  });
+  assert.match(html, /上标状态[^\n]*无需处理/);
+  assert.match(html, /status-no-action/);
+});
+
+test("no-action details retain the exact business reason and do not request follow-up", () => {
+  const allowedReasons = new Set(["非JT品牌", "非JT品牌且已停售", "已停售"]);
+  const noActionRecords = embeddedRecords.filter((row) => row.status === "无需处理");
+
+  assert.equal(noActionRecords.length, 9);
+  assert.ok(noActionRecords.every((row) => allowedReasons.has(row.rawReason)));
+  assert.match(html, /r\.status==='无需处理'\?'无需处理':'待跟进'/);
 });
 
 test("repository includes an admin-only local update path without publishing Excel", async () => {
