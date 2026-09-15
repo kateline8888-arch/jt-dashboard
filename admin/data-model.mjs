@@ -8,12 +8,19 @@ export function uniqueText(values, fallback = "\u672a\u5339\u914d") {
   return result.length ? result : [fallback];
 }
 
-export function deriveStatus({ oldStatus, latestStatus, hasRejection }) {
+export const NO_ACTION_REASONS = new Set(["非JT品牌", "非JT品牌且已停售", "已停售"]);
+
+export function isNoActionReason(value) {
+  return NO_ACTION_REASONS.has(cleanText(value));
+}
+
+export function deriveStatus({ oldStatus, latestStatus, hasRejection, unlistedReason }) {
   const latest = cleanText(latestStatus);
   const old = cleanText(oldStatus);
   if (latest === "\u662f") return "\u6210\u529f";
+  if (latest !== "\u5426" && old === "\u662f") return "\u6210\u529f";
+  if (isNoActionReason(unlistedReason)) return "无需处理";
   if (latest === "\u5426") return "\u5931\u8d25";
-  if (old === "\u662f") return "\u6210\u529f";
   if (hasRejection) return "\u5931\u8d25";
   return "\u5f85\u5904\u7406";
 }
